@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
 	"image"
 
 	_ "image/gif"
@@ -10,8 +11,8 @@ import (
 
 	"github.com/jung-kurt/gofpdf"
 
-	"github.com/pdfcpu/pdfcpu/pkg/cli"
-	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
+	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
 
 func Filter(vs []string, f func(string) bool) []string {
@@ -66,14 +67,89 @@ func CombinePDF(files []string, dest_pdf_path string) error {
 		}
 	}()
 
-	config := pdfcpu.NewDefaultConfiguration()
-	config.ValidationMode = pdfcpu.ValidationNone
-	cmd := cli.MergeCommand(files, dest_pdf_path, config)
-	_, err := cli.Process(cmd)
+	config := model.NewDefaultConfiguration()
+	config.ValidationMode = model.ValidationRelaxed
+	err := api.MergeCreateFile(files, dest_pdf_path, true, config)
 	if err != nil {
 		Log.Error(err)
 		return err
 	}
 
 	return nil
+}
+
+type PDFMetaInfo struct {
+	Title       string `json:"title"`
+	Author      string `json:"author"`
+	Subject     string `json:"subject"`
+	Keywords    string `json:"keywords"`
+	Creator     string `json:"creator"`
+	Producer   string `json:"producer"`
+}
+
+func GetMetaData(src_pdf_path string) (*PDFMetaInfo, error) {
+	ctx, err := api.ReadContextFile(src_pdf_path)
+	if err != nil {
+		Log.Error(err)
+		return nil, err
+	}
+
+	return &PDFMetaInfo{
+		Title:       ctx.Title,
+		Author:      ctx.Author,
+		Subject:     ctx.Subject,
+		Keywords:    ctx.Keywords,
+		Creator:     ctx.Creator,
+		Producer: ctx.Producer,
+	}, nil
+}
+
+func SetPDFMetaData(src_pdf_path string, meta *PDFMetaInfo) error {
+	ctx, err := api.ReadContextFile(src_pdf_path)
+	if err != nil {
+		Log.Error(err)
+		return err
+	}
+
+	mappings := make(map[string]string)
+	keys := []string{}
+
+	if meta.Title != "" {
+		mappings["Title"] = meta.Title
+		keys = append(keys, "Title")
+	}
+	if meta.Author != "" {
+		mappings["Author"] = meta.Author
+		keys = append(keys, "Author")
+	}
+	if meta.Subject != "" {
+		mappings["Subject"] = meta.Subject
+		keys = append(keys, "Subject")
+	}
+	if meta.Keywords != "" {
+		mappings["Keywords"] = meta.Keywords
+		keys = append(keys, "Keywords")
+	}
+	if meta.Creator != "" {
+		mappings["Creator"] = meta.Creator
+		keys = append(keys, "Creator")
+	}
+	if meta.Producer != "" {
+		mappings["Producer"] = meta.Producer
+		keys = append(keys, "Producer")
+	}
+
+	_, err = pdfcpu.PropertiesRemove(ctx, keys)
+	if err != nil {
+		Log.Error(err)
+		return err
+	}
+
+	err = pdfcpu.PropertiesAdd(ctx, mappings)
+	if err != nil {
+		Log.Error(err)
+		return err
+	}
+
+	return api.WriteContextFile(ctx, src_pdf_path)
 }

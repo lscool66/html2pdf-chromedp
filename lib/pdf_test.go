@@ -75,3 +75,33 @@ func Test_Combine(t *testing.T) {
 
 	t.Log("PASS")
 }
+
+func TestGetMetaData(t *testing.T) {
+	pdfPath := os.Getenv("TEST_PDF_PATH")
+	meta, err := GetMetaData(pdfPath)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+		return
+	}
+
+	t.Log(tests.ToJSON(meta))
+}
+
+func TestSetPDFMetaData(t *testing.T) {
+	pdfPath := os.Getenv("TEST_PDF_PATH")
+	meta := &PDFMetaInfo{
+		Author:      "driver.com.hk",
+		Creator:     "HTML2PDF",
+		Keywords:    "motors policy",
+		Subject:     "PDF Document",
+		Title:       "Cover Note",
+	}
+
+	err := SetPDFMetaData(pdfPath, meta)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+		return
+	}
+}
