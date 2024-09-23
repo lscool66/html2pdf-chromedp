@@ -12,13 +12,21 @@ type CleanerConfig struct {
 }
 
 type Config struct {
-	ChromePath string `json:"chrome_path"`
-	Listen     string `json:"listen"`
-	WebRoot    string `json:"web_root"`
-	Worker     int    `json:"worker"`
-	Timeout    int    `json:"timeout"`
+	ChromePath string         `json:"chrome_path"`
+	Listen     string         `json:"listen"`
+	WebRoot    string         `json:"web_root"`
+	Worker     int            `json:"worker"`
+	Timeout    int            `json:"timeout"`
 	Cleaner    *CleanerConfig `json:"cleaner"`
-	save_path string
+	BuildMeta  *PDFMeta       `json:"build_meta"`
+	save_path  string
+}
+
+type PDFMeta struct {
+	Author   string `json:"author"`
+	Creator  string `json:"creator"`
+	Keywords string `json:"keywords"`
+	Subject  string `json:"subject"`
 }
 
 func NewConfig(filename string) (err error, c *Config) {
@@ -54,6 +62,21 @@ func (this *Config) LoadWithENV() *Config {
 	}
 	if os.Getenv("CLEANER_FILE_AGE_LIMIT") != "" {
 		this.Cleaner.FileAgeLimit, _ = strconv.Atoi(os.Getenv("CLEANER_FILE_AGE_LIMIT"))
+	}
+
+	this.BuildMeta = &PDFMeta{}
+
+	if os.Getenv("PDF_AUTHOR") != "" {
+		this.BuildMeta.Author = os.Getenv("PDF_AUTHOR")
+	}
+	if os.Getenv("PDF_CREATOR") != "" {
+		this.BuildMeta.Creator = os.Getenv("PDF_CREATOR")
+	}
+	if os.Getenv("PDF_KEYWORDS") != "" {
+		this.BuildMeta.Keywords = os.Getenv("PDF_KEYWORDS")
+	}
+	if os.Getenv("PDF_SUBJECT") != "" {
+		this.BuildMeta.Subject = os.Getenv("PDF_SUBJECT")
 	}
 
 	return this

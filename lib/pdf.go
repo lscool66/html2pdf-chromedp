@@ -3,6 +3,7 @@ package lib
 import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
 	"image"
+	"strings"
 
 	_ "image/gif"
 	_ "image/jpeg"
@@ -152,4 +153,16 @@ func SetPDFMetaData(src_pdf_path string, meta *PDFMetaInfo) error {
 	}
 
 	return api.WriteContextFile(ctx, src_pdf_path)
+}
+
+func EncryptPDF(src_pdf_path string, out_pdf_path string, pwd string) error {
+
+	ownerPwd := strings.Clone(pwd)
+	userPwd := strings.Clone(pwd)
+
+	conf := model.NewAESConfiguration(userPwd, ownerPwd, 256)
+
+	conf.Permissions = model.PermissionsPrint
+
+	return api.EncryptFile(src_pdf_path, out_pdf_path, conf)
 }

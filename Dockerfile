@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine as builder
+FROM golang:1.20-alpine as builder
 
 # Add Maintainer Info
 LABEL maintainer="Sam Zhou <sam@mixmedia.com>"
@@ -11,8 +11,8 @@ COPY . /app
 
 # Build the Go app
 RUN go version \
- && export GO111MODULE=on \
- && export GOPROXY=https://goproxy.io,direct \
+ && export GOPROXY=https://goproxy.io \
+ && go mod tidy \
  && go mod vendor \
  && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o html2pdf
 
@@ -61,6 +61,10 @@ ENV WORKER=4 \
  LISTEN=0.0.0.0:4444 \
  WEB_ROOT=/app/web_root \
  TIMEOUT=60 \
+ PDF_AUTHOR=driver.com.hk \
+ PDF_CREATOR=HTML2PDF \
+ PDF_KEYWORDS=driver.com.hk,html2pdf \
+ PDF_SUBJECT=PDFDocument \
  CHROME_PATH=/headless-shell/headless-shell \
  LOG_LEVEL=INFO \
  CLEANER_PERIOD=1800 \

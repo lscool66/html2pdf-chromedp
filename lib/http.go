@@ -82,6 +82,16 @@ func (s *HTTPService) HTMLPDF(writer http.ResponseWriter, request *http.Request)
 	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%d.pdf", time.Now().UnixNano()))
 	writer.Header().Set("Content-Type", "application/pdf")
 
+	err = SetPDFMetaData(file, &PDFMetaInfo{
+		Author:      s.config.BuildMeta.Author,
+		Creator:     s.config.BuildMeta.Creator,
+		Keywords:    s.config.BuildMeta.Keywords,
+		Subject:     s.config.BuildMeta.Subject,
+	})
+	if err != nil {
+		Log.Error(err)
+	}
+
 	pdf, err := os.Open(file)
 	if err != nil {
 		http.Error(writer, err.Error(), 500)
@@ -110,6 +120,16 @@ func (s *HTTPService) LINKPDF(writer http.ResponseWriter, request *http.Request)
 	}
 	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%d.pdf", time.Now().UnixNano()))
 	writer.Header().Set("Content-Type", "application/pdf")
+
+	err = SetPDFMetaData(file, &PDFMetaInfo{
+		Author:      s.config.BuildMeta.Author,
+		Creator:     s.config.BuildMeta.Creator,
+		Keywords:    s.config.BuildMeta.Keywords,
+		Subject:     s.config.BuildMeta.Subject,
+	})
+	if err != nil {
+		Log.Error(err)
+	}
 
 	pdf, err := os.Open(file)
 	if err != nil {
@@ -239,6 +259,16 @@ func (s *HTTPService) LinkCombine(writer http.ResponseWriter, request *http.Requ
 		}
 	}
 
+	err := SetPDFMetaData(combine_path, &PDFMetaInfo{
+		Author:      s.config.BuildMeta.Author,
+		Creator:     s.config.BuildMeta.Creator,
+		Keywords:    s.config.BuildMeta.Keywords,
+		Subject:     s.config.BuildMeta.Subject,
+	})
+	if err != nil {
+		Log.Error(err)
+	}
+
 	download, err := os.Open(combine_path)
 	if err != nil {
 		http.Error(writer, err.Error(), 500)
@@ -298,6 +328,16 @@ func (s *HTTPService) COMBINE(writer http.ResponseWriter, request *http.Request)
 	if err != nil {
 		http.Error(writer, err.Error(), 500)
 		return
+	}
+
+	err = SetPDFMetaData(combine_path, &PDFMetaInfo{
+		Author:      s.config.BuildMeta.Author,
+		Creator:     s.config.BuildMeta.Creator,
+		Keywords:    s.config.BuildMeta.Keywords,
+		Subject:     s.config.BuildMeta.Subject,
+	})
+	if err != nil {
+		Log.Error(err)
 	}
 
 	download, err := os.Open(combine_path)

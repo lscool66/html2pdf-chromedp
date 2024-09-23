@@ -18,7 +18,7 @@ Provides multiple interfaces for different use cases:
 
 ## Compilation
 
-1. Install Golang environment, Go >= 1.8.
+1. Install Golang environment, Go >= 1.20.
 2. Checkout the source code.
 3. In the source directory, execute `go get -v` to check out all dependencies.
 4. Execute `go build -o html2pdf .` to compile into a binary executable.

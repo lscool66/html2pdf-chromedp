@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"fmt"
 	"html2pdf/tests"
 	"os"
 	"path/filepath"
@@ -99,6 +100,16 @@ func TestSetPDFMetaData(t *testing.T) {
 	}
 
 	err := SetPDFMetaData(pdfPath, meta)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+		return
+	}
+}
+
+func TestEncryptPDF(t *testing.T) {
+	pdfPath := os.Getenv("TEST_PDF_PATH")
+	err := EncryptPDF(pdfPath, fmt.Sprintf("%s.encrypted.pdf", pdfPath), "driver.com.hk")
 	if err != nil {
 		t.Log(err)
 		t.Fail()
