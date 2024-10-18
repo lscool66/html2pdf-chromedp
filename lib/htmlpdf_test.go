@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/chromedp/cdproto/page"
 	"html2pdf/tests"
+	"os"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func Test_BuildFromLink(t *testing.T) {
 
 	pdf := NewHTMLPDF(conf)
 
-	file, err := pdf.BuildFromLink("http://www.baidu.com")
+	file, err := pdf.BuildFromLink(os.Getenv("TEST_PDF_URL"))
 	if err != nil {
 		t.Log(err)
 		t.Fail()
