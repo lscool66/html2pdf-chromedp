@@ -3,7 +3,6 @@ package lib
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
@@ -22,16 +21,16 @@ type JobItem struct {
 	Index     int
 }
 
-func (this *JobItem) IsPDF() bool {
-	return strings.HasSuffix(this.Name, ".pdf")
+func (sel *JobItem) IsPDF() bool {
+	return strings.HasSuffix(sel.Name, ".pdf")
 }
 
-func (this *JobItem) IsImage() bool {
-	return strings.HasSuffix(this.Name, ".jpg") || strings.HasSuffix(this.Name, ".png") || strings.HasSuffix(this.Name, ".gif") || strings.HasSuffix(this.Name, ".jpeg")
+func (sel *JobItem) IsImage() bool {
+	return strings.HasSuffix(sel.Name, ".jpg") || strings.HasSuffix(sel.Name, ".png") || strings.HasSuffix(sel.Name, ".gif") || strings.HasSuffix(sel.Name, ".jpeg")
 }
 
-func (this *JobItem) IsHTML() bool {
-	return strings.HasSuffix(this.Name, ".html") || strings.HasSuffix(this.Name, ".htm")
+func (sel *JobItem) IsHTML() bool {
+	return strings.HasSuffix(sel.Name, ".html") || strings.HasSuffix(sel.Name, ".htm")
 }
 
 type JobList []*JobItem
@@ -60,27 +59,27 @@ func NewDownloader(UrlList []string, conf *Config) *Downloader {
 	}
 }
 
-//下载远程文件
-func (d *Downloader) DownloadRemoteFile(remoteURL string, index int) (error, *JobItem) {
+// 下载远程文件
+func (d *Downloader) DownloadRemoteFile(remoteURL string, index int) (*JobItem, error) {
 	Log.Debug("begin download file, url:", remoteURL)
 	var ext string
 	urlInfo, err := url.Parse(remoteURL)
 	if err != nil {
 		Log.Error(err)
-		return err, nil
+		return nil, err
 	}
 	ext = filepath.Ext(urlInfo.Path)
 
 	//检查是否存在本地文件，即remoteURL 为本地文件路劲
 	if _, err := os.Stat(remoteURL); err == nil {
 		Log.Debug("local file hint, path:", remoteURL)
-		return nil, &JobItem{
+		return &JobItem{
 			Name:      filepath.Base(remoteURL),
 			LocalPath: filepath.ToSlash(remoteURL),
 			URL:       filepath.ToSlash(remoteURL),
 			IsLocal:   true,
 			Index:     index,
-		}
+		}, nil
 	}
 
 	client := &http.Client{
@@ -89,7 +88,7 @@ func (d *Downloader) DownloadRemoteFile(remoteURL string, index int) (error, *Jo
 	resp, err := client.Get(remoteURL)
 	if err != nil {
 		Log.Error(err)
-		return err, nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -107,10 +106,10 @@ func (d *Downloader) DownloadRemoteFile(remoteURL string, index int) (error, *Jo
 		}
 	}
 
-	tmpFile, err := ioutil.TempFile("", fmt.Sprintf("*%s", ext))
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("*%s", ext))
 	if err != nil {
 		Log.Error(err)
-		return err, nil
+		return nil, err
 	}
 	defer tmpFile.Close()
 
@@ -119,16 +118,16 @@ func (d *Downloader) DownloadRemoteFile(remoteURL string, index int) (error, *Jo
 	_, err = io.Copy(tmpFile, resp.Body)
 	if err != nil {
 		Log.Error(err)
-		return err, nil
+		return nil, err
 	}
 
-	return nil, &JobItem{
+	return &JobItem{
 		Name:      filepath.Base(tmpFile.Name()),
 		LocalPath: filepath.ToSlash(tmpFile.Name()),
 		URL:       filepath.ToSlash(remoteURL),
 		Index:     index,
 		IsLocal:   false,
-	}
+	}, nil
 }
 
 func (d *Downloader) GetDownloadedFiles() <-chan *JobItem {
@@ -146,7 +145,7 @@ func (d *Downloader) GetDownloadedFiles() <-chan *JobItem {
 			limit <- true
 			defer func() { <-limit }()
 
-			err, jobItem := d.DownloadRemoteFile(url, i)
+			jobItem, err := d.DownloadRemoteFile(url, i)
 			if err != nil {
 				Log.Error(err)
 				return err

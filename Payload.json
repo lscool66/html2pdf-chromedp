@@ -1,0 +1,19 @@
+{
+    "hospCode": "ZGRMJFJBBZQZYY",
+    "reportId": "1833405731850027009",
+    "papperOption": {
+        "scale": 1,
+        "paperFormat": "A4",
+        "width": 0,
+        "height": 0,
+        "landscape": false,
+        "printBackground": true,
+        "preferCSSPageSize": true,
+        "pagerMargin": {
+            "marginTop": 0,
+            "marginRight": 0,
+            "marginBottom": 0,
+            "marginLeft": 0
+        }
+    }
+}

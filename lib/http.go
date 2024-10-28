@@ -1,9 +1,9 @@
 package lib
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -29,6 +29,10 @@ func (s *HTTPService) Start() {
 	r.HandleFunc("/", s.RedirectSwagger)
 	r.HandleFunc("/htmlpdf", s.HTMLPDF)
 	r.HandleFunc("/linkpdf", s.LINKPDF)
+	// 适配cwinlis
+	if s.config.PatchCwinlis {
+		r.HandleFunc("/pdf/v1/api/pdf/exporter/generatePdf", s.LINKPDF)
+	}
 	r.HandleFunc("/combine", s.COMBINE)
 	r.HandleFunc("/link/combine", s.LinkCombine)
 	r.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/",
@@ -45,7 +49,7 @@ func (s *HTTPService) NotFoundHandle(writer http.ResponseWriter, request *http.R
 }
 
 func (s *HTTPService) RedirectSwagger(writer http.ResponseWriter, request *http.Request) {
-	http.Redirect(writer, request, "/swagger/index.html", 301)
+	http.Redirect(writer, request, "/swagger/index.html", http.StatusMovedPermanently)
 }
 
 func (s *HTTPService) HTMLPDF(writer http.ResponseWriter, request *http.Request) {
@@ -64,7 +68,7 @@ func (s *HTTPService) HTMLPDF(writer http.ResponseWriter, request *http.Request)
 		}
 		defer file.Close()
 
-		bin, err = ioutil.ReadAll(file)
+		bin, err = io.ReadAll(file)
 		if err != nil {
 			Log.Error(err)
 			http.Error(writer, err.Error(), 500)
@@ -79,14 +83,14 @@ func (s *HTTPService) HTMLPDF(writer http.ResponseWriter, request *http.Request)
 		http.Error(writer, err.Error(), 500)
 		return
 	}
-	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%d.pdf", time.Now().UnixNano()))
+	// writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%d.pdf", time.Now().UnixNano()))
 	writer.Header().Set("Content-Type", "application/pdf")
 
 	err = SetPDFMetaData(file, &PDFMetaInfo{
-		Author:      s.config.BuildMeta.Author,
-		Creator:     s.config.BuildMeta.Creator,
-		Keywords:    s.config.BuildMeta.Keywords,
-		Subject:     s.config.BuildMeta.Subject,
+		Author:   s.config.BuildMeta.Author,
+		Creator:  s.config.BuildMeta.Creator,
+		Keywords: s.config.BuildMeta.Keywords,
+		Subject:  s.config.BuildMeta.Subject,
 	})
 	if err != nil {
 		Log.Error(err)
@@ -110,22 +114,91 @@ func (s *HTTPService) HTMLPDF(writer http.ResponseWriter, request *http.Request)
 
 func (s *HTTPService) LINKPDF(writer http.ResponseWriter, request *http.Request) {
 	link := request.FormValue("link")
+	// 适配cwinlis
+	var papperOption *PapperOption
+	papperOption_json := request.FormValue("papperOption")
+	if s.config.PatchCwinlis {
+		hospCode := request.FormValue("hospCode")
+		reportId := request.FormValue("reportId")
+		link = fmt.Sprintf("%s?hospCode=%s&reportId=%s", s.config.CwinlisUrl, hospCode, reportId)
+
+		json.Unmarshal([]byte(papperOption_json), &papperOption)
+	}
 
 	htmlpdf := NewHTMLPDF(s.config)
+	// 适配cwinlis
+	if papperOption != nil {
+		if papperOption.Scale > 0 {
+			htmlpdf.pdfOption.Scale = papperOption.Scale
+		}
+		var paperSize PaperSize
+		switch papperOption.PaperFormat {
+		case "A0":
+			paperSize = A0
+		case "A1":
+			paperSize = A1
+		case "A2":
+			paperSize = A2
+		case "A3":
+			paperSize = A3
+		case "A4":
+			paperSize = A4
+		case "A5":
+			paperSize = A5
+		case "A6":
+			paperSize = A6
+		case "LETTER":
+			paperSize = LETTER
+		case "LEGAL":
+			paperSize = LEGAL
+		case "TABLOID":
+			paperSize = TABLOID
+		case "LEDGER":
+			paperSize = LEDGER
+		default:
+			http.Error(writer, "Invalid paper type", http.StatusBadRequest)
+			return
+		}
+		if paperSize != A4 {
+			htmlpdf.pdfOption.PaperHeight = paperSize.getHeight()
+			htmlpdf.pdfOption.PaperWidth = paperSize.getWidth()
+		}
+		htmlpdf.pdfOption.Landscape = papperOption.Landscape
+		htmlpdf.pdfOption.PreferCSSPageSize = papperOption.PreferCSSPageSize
+		if papperOption.PagerMargin.Top > 0 {
+			htmlpdf.pdfOption.MarginTop = papperOption.PagerMargin.Top
+		}
+		if papperOption.PagerMargin.Left > 0 {
+			htmlpdf.pdfOption.MarginLeft = papperOption.PagerMargin.Left
+		}
+		if papperOption.PagerMargin.Right > 0 {
+			htmlpdf.pdfOption.MarginRight = papperOption.PagerMargin.Right
+		}
+		if papperOption.PagerMargin.Bottom > 0 {
+			htmlpdf.pdfOption.MarginBottom = papperOption.PagerMargin.Bottom
+		}
+		if papperOption.Width > 0 {
+			htmlpdf.pdfOption.PaperWidth = papperOption.Width
+		}
+		if papperOption.Height > 0 {
+			htmlpdf.pdfOption.PaperHeight = papperOption.Height
+		}
+
+	}
 	file, err := htmlpdf.BuildFromLink(link)
 	if err != nil {
 		Log.Error(err)
 		http.Error(writer, err.Error(), 500)
 		return
 	}
-	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%d.pdf", time.Now().UnixNano()))
+	// writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%d.pdf", time.Now().UnixNano()))
 	writer.Header().Set("Content-Type", "application/pdf")
 
 	err = SetPDFMetaData(file, &PDFMetaInfo{
-		Author:      s.config.BuildMeta.Author,
-		Creator:     s.config.BuildMeta.Creator,
-		Keywords:    s.config.BuildMeta.Keywords,
-		Subject:     s.config.BuildMeta.Subject,
+		Author:   s.config.BuildMeta.Author,
+		Creator:  s.config.BuildMeta.Creator,
+		Keywords: s.config.BuildMeta.Keywords,
+		Subject:  s.config.BuildMeta.Subject,
 	})
 	if err != nil {
 		Log.Error(err)
@@ -239,7 +312,7 @@ func (s *HTTPService) LinkCombine(writer http.ResponseWriter, request *http.Requ
 	if len(localFiles) == 1 {
 		combine_path = localFiles[0]
 	} else {
-		combineFile, err := ioutil.TempFile("", "*.pdf")
+		combineFile, err := os.CreateTemp("", "*.pdf")
 		if err != nil {
 			http.Error(writer, err.Error(), 500)
 			return
@@ -260,10 +333,10 @@ func (s *HTTPService) LinkCombine(writer http.ResponseWriter, request *http.Requ
 	}
 
 	err := SetPDFMetaData(combine_path, &PDFMetaInfo{
-		Author:      s.config.BuildMeta.Author,
-		Creator:     s.config.BuildMeta.Creator,
-		Keywords:    s.config.BuildMeta.Keywords,
-		Subject:     s.config.BuildMeta.Subject,
+		Author:   s.config.BuildMeta.Author,
+		Creator:  s.config.BuildMeta.Creator,
+		Keywords: s.config.BuildMeta.Keywords,
+		Subject:  s.config.BuildMeta.Subject,
 	})
 	if err != nil {
 		Log.Error(err)
@@ -285,7 +358,7 @@ func (s *HTTPService) LinkCombine(writer http.ResponseWriter, request *http.Requ
 		http.Error(writer, err.Error(), 500)
 		return
 	}
-	defer time.AfterFunc(time.Second * 10, func() {
+	defer time.AfterFunc(time.Second*10, func() {
 		os.Remove(combine_path)
 	})
 }
@@ -316,7 +389,7 @@ func (s *HTTPService) COMBINE(writer http.ResponseWriter, request *http.Request)
 			os.Remove(file)
 		}
 	}()
-	combineFile, err := ioutil.TempFile("", "*.pdf")
+	combineFile, err := os.CreateTemp("", "*.pdf")
 	if err != nil {
 		http.Error(writer, err.Error(), 500)
 		return
@@ -331,10 +404,10 @@ func (s *HTTPService) COMBINE(writer http.ResponseWriter, request *http.Request)
 	}
 
 	err = SetPDFMetaData(combine_path, &PDFMetaInfo{
-		Author:      s.config.BuildMeta.Author,
-		Creator:     s.config.BuildMeta.Creator,
-		Keywords:    s.config.BuildMeta.Keywords,
-		Subject:     s.config.BuildMeta.Subject,
+		Author:   s.config.BuildMeta.Author,
+		Creator:  s.config.BuildMeta.Creator,
+		Keywords: s.config.BuildMeta.Keywords,
+		Subject:  s.config.BuildMeta.Subject,
 	})
 	if err != nil {
 		Log.Error(err)
@@ -355,7 +428,7 @@ func (s *HTTPService) COMBINE(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	defer time.AfterFunc(time.Second * 10, func() {
+	defer time.AfterFunc(time.Second*10, func() {
 		os.Remove(combineFile.Name())
 	})
 

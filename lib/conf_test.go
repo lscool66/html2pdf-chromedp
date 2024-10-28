@@ -6,7 +6,7 @@ import (
 )
 
 func loadConfig() (*Config, error) {
-	err, conf := NewConfig(tests.GetLocalPath("../config.json"))
+	conf, err := NewConfig(tests.GetLocalPath("../config.json"))
 	if err != nil {
 		return nil, err
 	}

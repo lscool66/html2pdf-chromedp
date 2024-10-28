@@ -16,7 +16,7 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	err, conf := lib.NewConfig(*conf_path)
+	conf, err := lib.NewConfig(*conf_path)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -26,8 +26,8 @@ func main() {
 	cleaner := lib.NewCleaner(time.Duration(conf.Cleaner.CleanupPeriod)*time.Second,
 		time.Duration(conf.Cleaner.FileAgeLimit)*time.Second)
 
-	cleaner.Start();
-	defer cleaner.Stop();
+	cleaner.Start()
+	defer cleaner.Stop()
 
 	service := lib.NewHTTP(conf)
 	service.Start()

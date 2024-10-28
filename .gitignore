@@ -20,3 +20,4 @@
 /tests/*.pdf
 /tests/*.png
 /tests/*.html
+html2pdf*

@@ -1,8 +1,8 @@
 {
-    "chrome_path": "/headless-shell/headless-shell",
+    "chrome_path": "C:\\Users\\Administrator\\.cache\\puppeteer\\chrome-headless-shell\\win64-126.0.6478.182\\chrome-headless-shell-win64\\chrome-headless-shell.exe",
     "listen": "0.0.0.0:4444",
-    "web_root": "/app/web_root",
-    "worker": 4,
+    "web_root": "C:\\Users\\Administrator\\Desktop\\go\\html2pdf\\web_root",
+    "worker": 5,
     "timeout": 30,
     "cleaner": {
         "period": 10,
@@ -14,6 +14,6 @@
         "keywords": "",
         "subject": ""
     },
-    "patch_cwinlis": false,
+    "patch_cwinlis": true,
     "cwinlis_url": "http://10.101.17.234:20110/#/htmlPreview"
 }

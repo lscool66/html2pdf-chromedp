@@ -4,11 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/chromedp/cdproto/page"
-	"github.com/chromedp/chromedp"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/chromedp"
 )
 
 //go:embed motorsPDFjsPatch.js
@@ -20,10 +22,10 @@ type TaskResult struct {
 	Index int
 }
 
-type Task struct {
-	taskJob   chan *TaskResult
-	taskCount int
-}
+// type Task struct {
+// 	taskJob   chan *TaskResult
+// 	taskCount int
+// }
 
 type PDFOption struct {
 	page.PrintToPDFParams
@@ -32,9 +34,104 @@ type PDFOption struct {
 }
 
 type HTMLPDF struct {
-	config   *Config
+	config    *Config
 	pdfOption *PDFOption
-	jobQueue chan bool
+	jobQueue  chan bool
+}
+
+// 适配cwinlis
+type PagerMargin struct {
+	Top    float64 `json:"top"`
+	Right  float64 `json:"right"`
+	Bottom float64 `json:"bottom"`
+	Left   float64 `json:"left"`
+}
+
+type PapperOption struct {
+	Scale             float64      `json:"scale"`
+	PaperFormat       string       `json:"paperFormat"`
+	Width             float64      `json:"width"`
+	Height            float64      `json:"height"`
+	Landscape         bool         `json:"landscape"`
+	PreferCSSPageSize bool         `json:"preferCSSPageSize"`
+	PagerMargin       *PagerMargin `json:"pagerMargin"`
+	PrintBackground   bool         `json:"printBackground"`
+}
+
+type PaperSize int
+
+const (
+	A0 PaperSize = iota
+	A1
+	A2
+	A3
+	A4
+	A5
+	A6
+	LETTER
+	LEGAL
+	TABLOID
+	LEDGER
+)
+
+func (ps PaperSize) String() string {
+	return []string{"A0", "A1", "A2", "A3", "A4", "A5", "A6", "LETTER", "LEGAL", "TABLOID", "LEDGER"}[ps]
+}
+
+func (ps PaperSize) getWidth() float64 {
+	switch ps {
+	case A0:
+		return 33.11
+	case A1:
+		return 23.39
+	case A2:
+		return 16.54
+	case A3:
+		return 11.69
+	case A4:
+		return 8.27
+	case A5:
+		return 5.83
+	case A6:
+		return 4.13
+	case LETTER:
+		return 8.5
+	case LEGAL:
+		return 8.5
+	case TABLOID:
+		return 11
+	case LEDGER:
+		return 17
+	}
+	return 0
+}
+
+func (ps PaperSize) getHeight() float64 {
+	switch ps {
+	case A0:
+		return 46.81
+	case A1:
+		return 33.11
+	case A2:
+		return 23.39
+	case A3:
+		return 16.54
+	case A4:
+		return 11.69
+	case A5:
+		return 8.27
+	case A6:
+		return 5.83
+	case LETTER:
+		return 11
+	case LEGAL:
+		return 14
+	case TABLOID:
+		return 17
+	case LEDGER:
+		return 11
+	}
+	return 0
 }
 
 func NewHTMLPDF(conf *Config) *HTMLPDF {
@@ -43,18 +140,18 @@ func NewHTMLPDF(conf *Config) *HTMLPDF {
 		jobQueue: make(chan bool, conf.Worker),
 		pdfOption: &PDFOption{
 			PrintToPDFParams: page.PrintToPDFParams{
-				PaperWidth:  8.27, //A4
-				PaperHeight: 11.69, //A4
-				MarginTop:   0,
-				MarginRight: 0,
-				MarginBottom: 0,
-				MarginLeft: 0,
-				Scale: 1,
-				Landscape: false,
-				PrintBackground: true,
+				PaperWidth:        8.27,  //A4
+				PaperHeight:       11.69, //A4
+				MarginTop:         0,
+				MarginRight:       0,
+				MarginBottom:      0,
+				MarginLeft:        0,
+				Scale:             1,
+				Landscape:         false,
+				PrintBackground:   true,
 				PreferCSSPageSize: false,
 			},
-			patchMotors: true,
+			patchMotors: false,
 		},
 	}
 }
@@ -62,7 +159,7 @@ func NewHTMLPDF(conf *Config) *HTMLPDF {
 func (pdf *HTMLPDF) WithParams(params *page.PrintToPDFParams) *HTMLPDF {
 	pdf.pdfOption = &PDFOption{
 		PrintToPDFParams: *params,
-		patchMotors: pdf.pdfOption.patchMotors,
+		patchMotors:      pdf.pdfOption.patchMotors,
 	}
 	return pdf
 }
@@ -78,7 +175,7 @@ func (pdf *HTMLPDF) WithParamsRun(url string, params *page.PrintToPDFParams) (st
 
 func (pdf *HTMLPDF) run(url string) (string, error) {
 	// 將 PrintToPDFParams 轉換為 CSS @page 樣式
-	if pdf.pdfOption.Scale == 0  {
+	if pdf.pdfOption.Scale == 0 {
 		pdf.pdfOption.Scale = 1
 	}
 	customCSS := ""
@@ -98,7 +195,7 @@ func (pdf *HTMLPDF) run(url string) (string, error) {
 	`, pdf.pdfOption.PaperWidth, pdf.pdfOption.PaperHeight, pdf.pdfOption.MarginTop, pdf.pdfOption.MarginRight, pdf.pdfOption.MarginBottom, pdf.pdfOption.MarginLeft)
 	}
 
-	PreferCSSPageSize := false;
+	PreferCSSPageSize := false
 	if pdf.pdfOption.PreferCSSPageSize || pdf.pdfOption.patchMotors {
 		PreferCSSPageSize = true
 	}
@@ -116,21 +213,20 @@ func (pdf *HTMLPDF) run(url string) (string, error) {
 
 	Log.Debugf("PaperHeight: %f, PaperWidth: %f, dpi: %f, viewportWidth: %d, viewportHeight: %d", PaperHeight, PaperWidth, dpi, viewportWidth, viewportHeight)
 
-
 	// 自定義 Chrome 路徑
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(pdf.config.ChromePath),
 		chromedp.DisableGPU,
-		chromedp.Flag("disable-web-security",true),
-		chromedp.WindowSize(viewportWidth, viewportHeight + 50),
+		chromedp.Flag("disable-web-security", true),
+		chromedp.WindowSize(viewportWidth, viewportHeight+50),
 	)
 
-	//logLevel, ok := os.LookupEnv("LOG_LEVEL")
-	//if ok && logLevel == "DEBUG" {
-	//	opts = append(opts, chromedp.Flag("headless", false))
-	//}
+	// logLevel, ok := os.LookupEnv("LOG_LEVEL")
+	// if ok && logLevel == "DEBUG" {
+	// 	opts = append(opts, chromedp.Flag("headless", false))
+	// }
 
-	defaultCtx, cancel := context.WithTimeout(context.Background(), time.Second * time.Duration(pdf.config.Timeout))
+	defaultCtx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(pdf.config.Timeout))
 	defer cancel()
 
 	// 創建上下文
@@ -151,9 +247,16 @@ func (pdf *HTMLPDF) run(url string) (string, error) {
 	})
 
 	var buf []byte
+
+	// 适配cwinlis
+	selector := "body"
+	if pdf.config.PatchCwinlis {
+		selector = ".previewer-ready-to-pdf"
+	}
+
 	err := chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(url),
-		chromedp.WaitReady("body"),
+		chromedp.WaitReady(selector),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			Log.Debug("chromedp js patch")
 			if pdf.pdfOption.patchMotors {
@@ -201,7 +304,7 @@ func (pdf *HTMLPDF) run(url string) (string, error) {
 	}
 	defer page.Close()
 
-	tmpFile, err := ioutil.TempFile("", "*.pdf")
+	tmpFile, err := os.CreateTemp("", "*.pdf")
 	if err != nil {
 		Log.Error(err)
 		return "", err
@@ -226,7 +329,7 @@ func (pdf *HTMLPDF) BuildFromLink(link string) (local_pdf string, err error) {
 
 func (pdf *HTMLPDF) BuildFromSource(html []byte) (local_pdf string, err error) {
 
-	tmpFile, err := ioutil.TempFile("", "*.html")
+	tmpFile, err := os.CreateTemp("", "*.html")
 	if err != nil {
 		Log.Error(err)
 		return "", err
@@ -237,7 +340,6 @@ func (pdf *HTMLPDF) BuildFromSource(html []byte) (local_pdf string, err error) {
 		Log.Error(err)
 		return "", err
 	}
-
 
 	pdf_name, err := pdf.run(fmt.Sprintf("file://%s", tmpFile.Name()))
 	if err != nil {
